@@ -1,0 +1,84 @@
+# NAS / 生产环境部署
+# 用法:
+#   cp .env.example .env   # 按下方说明修改 DATABASE_URL / REDIS_URL
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: tangyuan-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tangyuan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tangyuan_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tangyuan} -d ${POSTGRES_DB:-tangyuan_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 不映射 5432 到宿主机，仅容器内网访问（更安全）
+
+  redis:
+    image: redis:7-alpine
+    container_name: tangyuan-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: tangyuan-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # 容器内必须用服务名，不能用 localhost
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tangyuan}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tangyuan_db}
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_BASE_DIR: /data/uploads
+      APP_ENV: production
+      DEBUG: "false"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+  celery:
+    build: .
+    container_name: tangyuan-celery
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tangyuan}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tangyuan_db}
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_BASE_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.core.celery_app worker --loglevel=info --queues=knowledge --concurrency=2
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
