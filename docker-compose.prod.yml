@@ -1,8 +1,11 @@
 # NAS / 生产环境部署
 # 用法:
-#   cp .env.example .env   # 按下方说明修改 DATABASE_URL / REDIS_URL
-#   docker compose -f docker-compose.prod.yml up -d --build
+#   cp .env.example .env   # 填写 POSTGRES_PASSWORD、密钥、CLOUDFLARE_TUNNEL_TOKEN 等
+#   docker compose -f docker-compose.prod.yml --profile tunnel up -d --build
 #   docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+#
+# Cloudflare Zero Trust → Tunnels → Public Hostname:
+#   Service URL = http://api:8000
 
 services:
   db:
@@ -77,6 +80,17 @@ services:
       redis:
         condition: service_healthy
     command: celery -A app.core.celery_app worker --loglevel=info --queues=knowledge --concurrency=2
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tangyuan-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - api
 
 volumes:
   pgdata:
