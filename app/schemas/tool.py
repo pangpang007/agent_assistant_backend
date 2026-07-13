@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.transport_crypto import decrypt_sensitive_dict_fields
+
 
 class ToolListParams(BaseModel):
     page: int = Field(default=1, ge=1)
@@ -62,6 +64,11 @@ class ToolCreateRequest(BaseModel):
             raise ValueError("api_url 必须以 http:// 或 https:// 开头")
         return v
 
+    @field_validator("auth_config")
+    @classmethod
+    def decrypt_auth_config(cls, v: dict | None) -> dict | None:
+        return decrypt_sensitive_dict_fields(v, ("api_key_value", "token"))
+
 
 class ToolCreateResponse(BaseModel):
     id: uuid.UUID
@@ -76,6 +83,11 @@ class ToolUpdateRequest(BaseModel):
     openapi_spec: Optional[dict] = None
     auth_type: Optional[str] = Field(default=None, pattern="^(none|api_key|bearer)$")
     auth_config: Optional[dict] = None
+
+    @field_validator("auth_config")
+    @classmethod
+    def decrypt_auth_config(cls, v: dict | None) -> dict | None:
+        return decrypt_sensitive_dict_fields(v, ("api_key_value", "token"))
 
 
 class ToolDeleteResponse(BaseModel):

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Application
@@ -35,6 +36,12 @@ class Settings(BaseSettings):
 
     # Encryption
     fernet_key: str = "change-me-fernet-key"
+
+    # Transport encryption (前端 → 后端敏感字段)
+    # PEM 私钥；多 worker 时务必配置同一把，或依赖 uploads/.transport_rsa.pem 共享卷
+    transport_rsa_private_key_pem: str = ""
+    # production 建议 true：强制敏感字段使用 enc:v1:...
+    transport_require_encryption: bool = False
 
     # Tool Security
     tool_test_timeout_seconds: int = 30

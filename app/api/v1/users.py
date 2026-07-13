@@ -30,8 +30,8 @@ def _build_profile_response(result: dict) -> dict:
     return user_data.model_dump()
 
 
-@router.get("/me")
-async def get_me(
+@router.get("/profile")
+async def get_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,8 +44,8 @@ async def get_me(
     }
 
 
-@router.patch("/me")
-async def update_me(
+@router.patch("/profile")
+async def update_profile(
     body: UserUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -65,7 +65,7 @@ async def update_me(
     }
 
 
-@router.post("/me/change-password")
+@router.post("/profile/change-password")
 async def change_password(
     body: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),

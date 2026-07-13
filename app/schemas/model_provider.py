@@ -5,6 +5,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.core.transport_crypto import SensitiveStr
+
 
 class ProviderListItem(BaseModel):
     id: uuid.UUID
@@ -26,7 +28,7 @@ class ProviderListResponse(BaseModel):
 class ProviderCreateRequest(BaseModel):
     provider_name: str = Field(..., min_length=1, max_length=100)
     provider_type: str = Field(..., pattern="^(openai|anthropic|google|custom)$")
-    api_key: str = Field(..., min_length=1, max_length=1024)
+    api_key: SensitiveStr = Field(..., min_length=1, max_length=1024)
     base_url: Optional[str] = Field(default=None, max_length=2048)
     models: list[str] = Field(default_factory=list)
 
@@ -46,7 +48,7 @@ class ProviderCreateResponse(BaseModel):
 
 class ProviderUpdateRequest(BaseModel):
     provider_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    api_key: Optional[str] = Field(default=None, min_length=1, max_length=1024)
+    api_key: Optional[SensitiveStr] = Field(default=None, min_length=1, max_length=1024)
     base_url: Optional[str] = Field(default=None, max_length=2048)
 
 

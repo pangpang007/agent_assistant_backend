@@ -44,8 +44,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-setup_cors(app)
+# RequestLog 先加；CORS 后加（最后添加的中间件在最外层）
+# 避免 BaseHTTPMiddleware 在异常响应上丢失 CORS 头
 app.add_middleware(RequestLogMiddleware)
+setup_cors(app)
 setup_error_handlers(app)
 
 app.include_router(api_router)

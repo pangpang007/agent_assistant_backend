@@ -6,20 +6,20 @@ from app.models.user import User
 
 @pytest.mark.asyncio
 class TestUsers:
-    async def test_get_me_success(self, client, auth_headers):
-        response = await client.get("/api/users/me", headers=auth_headers)
+    async def test_get_profile_success(self, client, auth_headers):
+        response = await client.get("/api/users/profile", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["data"]["email"] == "test@example.com"
         assert data["data"]["username"] == "testuser"
 
-    async def test_get_me_unauthorized(self, client):
-        response = await client.get("/api/users/me")
+    async def test_get_profile_unauthorized(self, client):
+        response = await client.get("/api/users/profile")
         assert response.status_code == 401
 
     async def test_update_username_success(self, client, auth_headers):
         response = await client.patch(
-            "/api/users/me",
+            "/api/users/profile",
             json={"username": "newname"},
             headers=auth_headers,
         )
@@ -38,7 +38,7 @@ class TestUsers:
         await db_session.commit()
 
         response = await client.patch(
-            "/api/users/me",
+            "/api/users/profile",
             json={"username": "taken"},
             headers=auth_headers,
         )
@@ -46,7 +46,7 @@ class TestUsers:
 
     async def test_update_no_fields(self, client, auth_headers):
         response = await client.patch(
-            "/api/users/me",
+            "/api/users/profile",
             json={},
             headers=auth_headers,
         )
@@ -54,7 +54,7 @@ class TestUsers:
 
     async def test_change_password_success(self, client, auth_headers):
         response = await client.post(
-            "/api/users/me/change-password",
+            "/api/users/profile/change-password",
             json={
                 "old_password": "TestPass123",
                 "new_password": "NewPass456",
@@ -65,7 +65,7 @@ class TestUsers:
 
     async def test_change_password_wrong_old(self, client, auth_headers):
         response = await client.post(
-            "/api/users/me/change-password",
+            "/api/users/profile/change-password",
             json={
                 "old_password": "WrongOld123",
                 "new_password": "NewPass456",
@@ -77,7 +77,7 @@ class TestUsers:
 
     async def test_change_password_same(self, client, auth_headers):
         response = await client.post(
-            "/api/users/me/change-password",
+            "/api/users/profile/change-password",
             json={
                 "old_password": "TestPass123",
                 "new_password": "TestPass123",

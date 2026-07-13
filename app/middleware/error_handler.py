@@ -4,9 +4,22 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.core.exceptions import AppException
 
 logger = structlog.get_logger()
+
+
+def _cors_headers(request: Request) -> dict[str, str]:
+    """异常响应也带上 CORS，避免浏览器把业务错误误报成 CORS error。"""
+    origin = request.headers.get("origin")
+    if origin and origin in settings.cors_origins:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
 
 
 def setup_error_handlers(app: FastAPI) -> None:
@@ -22,6 +35,7 @@ def setup_error_handlers(app: FastAPI) -> None:
                     "details": exc.details,
                 }
             },
+            headers=_cors_headers(request),
         )
 
     @app.exception_handler(RequestValidationError)
@@ -41,6 +55,7 @@ def setup_error_handlers(app: FastAPI) -> None:
                     ],
                 }
             },
+            headers=_cors_headers(request),
         )
 
     @app.exception_handler(IntegrityError)
@@ -55,6 +70,7 @@ def setup_error_handlers(app: FastAPI) -> None:
                     "details": [],
                 }
             },
+            headers=_cors_headers(request),
         )
 
     @app.exception_handler(Exception)
@@ -69,4 +85,5 @@ def setup_error_handlers(app: FastAPI) -> None:
                     "details": [],
                 }
             },
+            headers=_cors_headers(request),
         )

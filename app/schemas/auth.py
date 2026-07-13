@@ -4,11 +4,13 @@ import re
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.core.transport_crypto import SensitiveStr
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
     username: str = Field(..., min_length=2, max_length=100)
-    password: str = Field(..., min_length=8, max_length=128)
+    password: SensitiveStr = Field(..., min_length=8, max_length=128)
     account_type: str = Field(default="personal", pattern="^(personal|team)$")
     team_name: str | None = Field(default=None, min_length=1, max_length=200)
 
@@ -43,7 +45,7 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=1)
+    password: SensitiveStr = Field(..., min_length=1)
 
 
 class RefreshRequest(BaseModel):
@@ -51,8 +53,8 @@ class RefreshRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=8, max_length=128)
+    old_password: SensitiveStr = Field(..., min_length=1)
+    new_password: SensitiveStr = Field(..., min_length=8, max_length=128)
 
     @field_validator("new_password")
     @classmethod
