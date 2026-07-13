@@ -1,8 +1,8 @@
-# NAS / 生产环境部署
-# 用法:
-#   cp .env.example .env   # 填写 POSTGRES_PASSWORD、密钥、CLOUDFLARE_TUNNEL_TOKEN 等
-#   docker compose -f docker-compose.prod.yml --profile tunnel up -d --build
-#   docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+# NAS / 生产环境部署 → 使用 scripts/deploy.sh
+#
+# 首次: sudo ./scripts/deploy.sh --init
+# 日常: sudo ./scripts/deploy.sh
+# 仅重启: sudo ./scripts/deploy.sh --restart
 #
 # Cloudflare Zero Trust → Tunnels → Public Hostname:
 #   Service URL = http://api:8000
@@ -40,6 +40,7 @@ services:
 
   api:
     build: .
+    image: tangyuan-backend:latest
     container_name: tangyuan-api
     restart: unless-stopped
     ports:
@@ -63,7 +64,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 
   celery:
-    build: .
+    image: tangyuan-backend:latest
     container_name: tangyuan-celery
     restart: unless-stopped
     env_file:
