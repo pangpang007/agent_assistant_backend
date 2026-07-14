@@ -55,6 +55,12 @@ class ExecutionStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class ExecutionSource(str, enum.Enum):
+    web = "web"
+    api = "api"
+    system = "system"
+
+
 class NodeStatus(str, enum.Enum):
     pending = "pending"
     running = "running"

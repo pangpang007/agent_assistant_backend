@@ -23,9 +23,8 @@ def _workflow_detail(workflow) -> dict:
         "edges_data": workflow.edges_data or [],
         "current_version": workflow.current_version,
         "is_published_api": workflow.is_published_api,
-        "published_api_key": str(workflow.published_api_key)
-        if workflow.published_api_key
-        else None,
+        "published_api_key": workflow.published_api_key,
+        "api_is_active": getattr(workflow, "api_is_active", True),
         "created_at": workflow.created_at.isoformat(),
         "updated_at": workflow.updated_at.isoformat(),
     }

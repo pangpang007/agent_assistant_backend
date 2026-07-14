@@ -18,9 +18,10 @@ from app.core.exceptions import (
     WorkflowEmptyError,
     WorkflowNotFoundError,
 )
-from app.models.enums import ExecutionStatus, NodeStatus
+from app.models.enums import ExecutionSource, ExecutionStatus, NodeStatus
 from app.models.execution import Execution, ExecutionNode, Log
 from app.models.workflow import Workflow
+from app.services.cache_invalidator import CacheInvalidator
 from app.schemas.execution import (
     CancelExecutionResponse,
     DailyTrendItem,
@@ -69,11 +70,13 @@ class ExecutionService:
             workflow_id=workflow_id,
             version_number=workflow.current_version,
             status=ExecutionStatus.pending,
+            source=ExecutionSource.web.value,
             input_data=input_data,
             started_at=datetime.now(timezone.utc),
         )
         self.db.add(execution)
         await self.db.flush()
+        await CacheInvalidator.invalidate_dashboard(str(user_id))
 
         execution_id = execution.id
         nodes_data = workflow.nodes_data

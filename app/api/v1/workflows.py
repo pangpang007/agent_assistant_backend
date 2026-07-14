@@ -23,6 +23,7 @@ from app.schemas.execution import WorkflowRunRequest
 from app.schemas.template import SaveAsTemplateRequest, TemplateDetailResponse
 from app.services.execution_service import ExecutionService
 from app.services.node_test_service import NodeTestService
+from app.services.publish_api_service import PublishApiService
 from app.services.template_service import TemplateService
 from app.services.validation_service import ValidationService
 from app.services.version_service import VersionService
@@ -41,9 +42,8 @@ def _workflow_detail(workflow) -> dict:
         "edges_data": workflow.edges_data or [],
         "current_version": workflow.current_version,
         "is_published_api": workflow.is_published_api,
-        "published_api_key": str(workflow.published_api_key)
-        if workflow.published_api_key
-        else None,
+        "published_api_key": workflow.published_api_key,
+        "api_is_active": getattr(workflow, "api_is_active", True),
         "created_at": workflow.created_at.isoformat(),
         "updated_at": workflow.updated_at.isoformat(),
     }
@@ -375,3 +375,39 @@ async def test_node(
             "error": result.error,
         },
     }
+
+
+@router.post("/{workflow_id}/publish-api")
+async def publish_api(
+    workflow_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """发布工作流为外部 API。"""
+    service = PublishApiService()
+    data = await service.publish_api(db, str(current_user.id), str(workflow_id))
+    return {"code": 0, "message": "success", "data": data}
+
+
+@router.delete("/{workflow_id}/publish-api")
+async def unpublish_api(
+    workflow_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """取消工作流 API 发布。"""
+    service = PublishApiService()
+    data = await service.unpublish_api(db, str(current_user.id), str(workflow_id))
+    return {"code": 0, "message": "success", "data": data}
+
+
+@router.post("/{workflow_id}/publish-api/reset-key")
+async def reset_api_key(
+    workflow_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """重置已发布 API 的 Key。"""
+    service = PublishApiService()
+    data = await service.reset_api_key(db, str(current_user.id), str(workflow_id))
+    return {"code": 0, "message": "success", "data": data}

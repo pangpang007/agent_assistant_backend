@@ -59,7 +59,8 @@ class WorkflowDetailResponse(BaseModel):
     edges_data: Optional[list] = None
     current_version: int
     is_published_api: bool
-    published_api_key: Optional[uuid.UUID] = None
+    published_api_key: Optional[str] = None
+    api_is_active: bool = True
     created_at: datetime
     updated_at: datetime
 

@@ -75,5 +75,24 @@ class Settings(BaseSettings):
     execution_default_timeout: int = 300
     review_default_timeout: int = 3600
 
+    # Phase 7: API publish
+    api_key_prefix: str = "sk-"
+    api_key_length: int = 32
+    external_api_timeout_seconds: int = 300
+
+    # Phase 7: Rate limiting
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute_auth: int = 10
+    rate_limit_per_minute_publish: int = 5
+    rate_limit_per_minute_default: int = 120
+    rate_limit_per_minute_external: int = 30
+    rate_limit_per_day_external: int = 1000
+    max_request_body_size: int = 10 * 1024 * 1024
+
+    # Phase 7: Cache TTLs
+    dashboard_cache_ttl: int = 60
+    api_key_cache_ttl: int = 300
+    search_cache_ttl: int = 30
+
 
 settings = Settings()

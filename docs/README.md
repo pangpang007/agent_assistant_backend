@@ -27,6 +27,7 @@ docs/
 | [Phase 4](phase4/README.md) | 工作流编辑器后端 | 已完成 |
 | [Phase 5](phase5/README.md) | 工作流执行引擎 | 已完成 |
 | [Phase 6](phase6/README.md) | 模板 / 版本标签 / 执行历史 / 日志 / 环境变量 | 已完成 |
+| [Phase 7](phase7/README.md) | Dashboard / API 发布 / 全局搜索 / 安全打磨 | 已完成 |
 
 ## 文档规范
 

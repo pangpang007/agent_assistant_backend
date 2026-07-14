@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base, UUIDPrimaryKeyMixin
-from .enums import ExecutionStatus, LogLevel, NodeStatus
+from .enums import ExecutionSource, ExecutionStatus, LogLevel, NodeStatus
 
 
 class Execution(Base, UUIDPrimaryKeyMixin):
@@ -38,6 +38,17 @@ class Execution(Base, UUIDPrimaryKeyMixin):
     )
     finished_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    source: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default=ExecutionSource.web.value,
+        server_default="web",
+        index=True,
+    )
+    api_caller_workflow_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
     )
 
     workflow = relationship("Workflow", back_populates="executions")

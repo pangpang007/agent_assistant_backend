@@ -7,7 +7,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.redis import close_redis, init_redis
-from app.middleware import setup_cors
+from app.middleware import setup_cors, setup_security_middleware
 from app.middleware.error_handler import setup_error_handlers
 from app.middleware.request_log import RequestLogMiddleware
 
@@ -44,9 +44,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# RequestLog 先加；CORS 后加（最后添加的中间件在最外层）
-# 避免 BaseHTTPMiddleware 在异常响应上丢失 CORS 头
+# Middleware order (last added = outermost):
+# RequestLog → security (body/headers/rate) → CORS
 app.add_middleware(RequestLogMiddleware)
+setup_security_middleware(app)
 setup_cors(app)
 setup_error_handlers(app)
 

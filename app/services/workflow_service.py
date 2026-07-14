@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenException, WorkflowNotFoundError
 from app.models.workflow import Workflow
 from app.schemas.workflow import WorkflowListItem
+from app.services.cache_invalidator import CacheInvalidator
 from app.services.version_service import VersionService
 
 
@@ -101,6 +102,8 @@ class WorkflowService:
             tag="初始版本",
         )
         await self.db.flush()
+        await CacheInvalidator.invalidate_dashboard(str(user_id))
+        await CacheInvalidator.invalidate_search(str(user_id))
         return workflow
 
     async def get_workflow(self, workflow_id: UUID, user_id: UUID) -> Workflow:
@@ -151,8 +154,12 @@ class WorkflowService:
 
     async def delete_workflow(self, workflow_id: UUID, user_id: UUID) -> None:
         workflow = await self.get_workflow(workflow_id, user_id)
+        if workflow.published_api_key:
+            await CacheInvalidator.invalidate_api_key(workflow.published_api_key)
         self.db.delete(workflow)
         await self.db.flush()
+        await CacheInvalidator.invalidate_dashboard(str(user_id))
+        await CacheInvalidator.invalidate_search(str(user_id))
 
     async def export_workflow(self, workflow: Workflow) -> dict:
         return {

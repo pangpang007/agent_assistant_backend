@@ -197,3 +197,97 @@ class EnvVarTypeImmutableError(AppException):
             status_code=400,
         )
 
+
+# ---- Phase 7 ----
+
+
+class EmptyWorkflowError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="EMPTY_WORKFLOW",
+            message="工作流画布为空，无法发布",
+            status_code=400,
+        )
+
+
+class NotPublishedError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="NOT_PUBLISHED",
+            message="工作流未发布为 API",
+            status_code=400,
+        )
+
+
+class MissingInputError(AppException):
+    def __init__(self, name: str):
+        super().__init__(
+            code="MISSING_INPUT",
+            message=f"缺少必填输入参数: {name}",
+            status_code=400,
+        )
+
+
+class ApiKeyMissingError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="API_KEY_MISSING",
+            message="缺少 API Key",
+            status_code=401,
+        )
+
+
+class InvalidApiKeyError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="INVALID_API_KEY",
+            message="无效的 API Key",
+            status_code=401,
+        )
+
+
+class ApiDisabledError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="API_DISABLED",
+            message="该 API 已被停用",
+            status_code=403,
+        )
+
+
+class ExecutionTimeoutError(AppException):
+    def __init__(self, seconds: int = 300):
+        super().__init__(
+            code="EXECUTION_TIMEOUT",
+            message=f"工作流执行超时（超过 {seconds} 秒）",
+            status_code=408,
+        )
+
+
+class PayloadTooLargeError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="PAYLOAD_TOO_LARGE",
+            message="请求体过大，最大允许 10MB",
+            status_code=413,
+        )
+
+
+class RateLimitedError(AppException):
+    def __init__(self, retry_after: int = 60):
+        super().__init__(
+            code="RATE_LIMITED",
+            message="请求频率超限，请稍后重试",
+            status_code=429,
+            details=[{"retry_after": retry_after}],
+        )
+
+
+class ExternalExecutionFailedError(AppException):
+    def __init__(self, message: str = "外部调用执行失败"):
+        super().__init__(
+            code="EXECUTION_FAILED",
+            message=message,
+            status_code=500,
+        )
+
