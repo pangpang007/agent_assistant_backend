@@ -97,7 +97,7 @@ class ToolDeleteResponse(BaseModel):
 
 
 class ToolTestRequest(BaseModel):
-    parameters: dict = Field(..., description="工具调用参数")
+    parameters: dict = Field(default_factory=dict, description="工具调用参数")
     timeout: int = Field(default=30, ge=1, le=60)
 
 

@@ -188,6 +188,22 @@ async def list_versions(
     return {"code": 0, "message": "success", "data": result}
 
 
+# 必须声明在 /versions/{version_number} 之前，否则 "diff" 会被当成 version_number
+@router.get("/{workflow_id}/versions/diff")
+async def diff_versions(
+    workflow_id: uuid.UUID,
+    v1: int = Query(..., ge=1),
+    v2: int = Query(..., ge=1),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    wf_service = WorkflowService(db)
+    await wf_service.get_workflow(workflow_id, current_user.id)
+    version_service = VersionService(db)
+    diff = await version_service.diff_versions(workflow_id, v1, v2)
+    return {"code": 0, "message": "success", "data": diff.model_dump()}
+
+
 @router.get("/{workflow_id}/versions/{version_number}")
 async def get_version(
     workflow_id: uuid.UUID,
@@ -266,21 +282,6 @@ async def remove_tag(
     if result.get("created_at"):
         result["created_at"] = result["created_at"].isoformat()
     return {"code": 0, "message": "success", "data": result}
-
-
-@router.get("/{workflow_id}/versions/diff")
-async def diff_versions(
-    workflow_id: uuid.UUID,
-    v1: int = Query(..., ge=1),
-    v2: int = Query(..., ge=1),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    wf_service = WorkflowService(db)
-    await wf_service.get_workflow(workflow_id, current_user.id)
-    version_service = VersionService(db)
-    diff = await version_service.diff_versions(workflow_id, v1, v2)
-    return {"code": 0, "message": "success", "data": diff.model_dump()}
 
 
 @router.post("/{workflow_id}/save-as-template")

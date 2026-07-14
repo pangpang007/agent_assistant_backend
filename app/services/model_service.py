@@ -92,14 +92,23 @@ class ModelService:
         data: dict,
     ) -> ModelProvider:
         """添加供应商。"""
-        # 加密 API Key
-        api_key_plain = data.pop("api_key")
-        model_names = data.pop("models", [])
+        # 复制后再 pop，避免污染调用方 dict；并显式取字段防止 **kwargs 与命名参数冲突
+        payload = dict(data)
+        api_key_plain = payload.pop("api_key")
+        model_names = payload.pop("models", []) or []
+        provider_name = payload.pop("provider_name")
+        provider_type = payload.pop("provider_type")
+        base_url = payload.pop("base_url", None)
+
+        if not api_key_plain:
+            raise AppException(
+                code="INVALID_API_KEY",
+                message="API Key 不能为空",
+                status_code=400,
+            )
+
         api_key_encrypted = encrypt_value(api_key_plain)
 
-        # 默认 base_url
-        provider_type = data.get("provider_type")
-        base_url = data.get("base_url")
         if not base_url:
             default_urls = {
                 "openai": "https://api.openai.com/v1",
@@ -110,10 +119,11 @@ class ModelService:
 
         provider = ModelProvider(
             user_id=user_id,
+            provider_name=provider_name,
+            provider_type=provider_type,
             api_key_encrypted=api_key_encrypted,
             base_url=base_url,
             is_enabled=True,
-            **{k: v for k, v in data.items() if v is not None},
         )
         db.add(provider)
         await db.flush()

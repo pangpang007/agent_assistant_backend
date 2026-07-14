@@ -1,6 +1,7 @@
 import uuid
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -107,15 +108,16 @@ async def delete_tool(
 @router.post("/{tool_id}/test")
 async def test_tool(
     tool_id: uuid.UUID,
-    body: ToolTestRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    body: Optional[ToolTestRequest] = Body(default=None),
 ):
+    req = body or ToolTestRequest()
     data = await ToolService.test_tool(
         db=db,
         tool_id=tool_id,
         current_user=current_user,
-        parameters=body.parameters,
-        timeout=body.timeout,
+        parameters=req.parameters,
+        timeout=req.timeout,
     )
     return {"code": 0, "message": "success", "data": data}
