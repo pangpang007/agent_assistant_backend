@@ -67,9 +67,36 @@ async def join_team(
 
 @router.get("/members")
 async def get_members(
-    team: Team = Depends(require_owner),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # 未加入团队时返回空列表（避免测试/前端在创建团队前被 403）
+    if current_user.team_id is None:
+        return {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "team_id": None,
+                "team_name": None,
+                "members": [],
+                "total": 0,
+            },
+        }
+
+    result = await db.execute(select(Team).where(Team.id == current_user.team_id))
+    team = result.scalar_one_or_none()
+    if team is None:
+        return {
+            "code": 0,
+            "message": "success",
+            "data": {
+                "team_id": None,
+                "team_name": None,
+                "members": [],
+                "total": 0,
+            },
+        }
+
     members = await TeamService.get_members(db=db, team=team)
 
     return {

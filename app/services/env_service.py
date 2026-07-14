@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -141,7 +142,10 @@ class EnvService:
         if value is not None:
             env_var.value_encrypted = encrypt_value(value)
 
+        # onupdate=func.now() 不会立即回填 Python 属性，避免序列化时 updated_at=None
+        env_var.updated_at = datetime.now(timezone.utc)
         await self.db.flush()
+        await self.db.refresh(env_var)
         return env_var
 
     async def delete_env_var(

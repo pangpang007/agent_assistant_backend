@@ -131,7 +131,7 @@ class ModelService:
             )
             db.add(model)
 
-        await db.commit()
+        await db.flush()
         await db.refresh(provider)
         return provider
 

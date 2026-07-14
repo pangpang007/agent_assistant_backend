@@ -238,17 +238,17 @@ class ToolService:
         )
         agent_count = count_result.scalar() or 0
 
-        if not force:
+        if agent_count > 0 and not force:
             return {
-                "message": f"有 {agent_count} 个 Agent 正在使用此工具",
+                "message": f"有 {agent_count} 个 Agent 正在使用此工具，请传入 force=true 强制删除",
                 "agent_count": agent_count,
                 "deleted": False,
             }
 
-        # 强制删除
+        # 无引用，或 force=true：执行删除
         await db.execute(delete(AgentTool).where(AgentTool.tool_id == tool_id))
-        db.delete(tool)
-        await db.commit()
+        await db.delete(tool)
+        await db.flush()
 
         return {
             "message": "工具已删除",

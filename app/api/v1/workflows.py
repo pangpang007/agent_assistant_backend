@@ -33,6 +33,8 @@ router = APIRouter()
 
 
 def _workflow_detail(workflow) -> dict:
+    created_at = workflow.created_at.isoformat() if workflow.created_at else None
+    updated_at = workflow.updated_at.isoformat() if workflow.updated_at else created_at
     return {
         "id": str(workflow.id),
         "user_id": str(workflow.user_id),
@@ -44,8 +46,8 @@ def _workflow_detail(workflow) -> dict:
         "is_published_api": workflow.is_published_api,
         "published_api_key": workflow.published_api_key,
         "api_is_active": getattr(workflow, "api_is_active", True),
-        "created_at": workflow.created_at.isoformat(),
-        "updated_at": workflow.updated_at.isoformat(),
+        "created_at": created_at,
+        "updated_at": updated_at,
     }
 
 

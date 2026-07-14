@@ -324,18 +324,18 @@ class AgentService:
         current_user: User,
         new_name: Optional[str] = None,
     ) -> Agent:
-        """复制预置 Agent 为自定义 Agent。"""
+        """复制 Agent（预置或当前用户自定义）为自定义 Agent。"""
         result = await db.execute(select(Agent).where(Agent.id == agent_id))
         agent = result.scalar_one_or_none()
 
         if agent is None:
             raise AppException(code="AGENT_NOT_FOUND", message="Agent 不存在", status_code=404)
 
-        if not agent.is_preset:
+        if not agent.is_preset and agent.user_id != current_user.id:
             raise AppException(
-                code="ONLY_PRESET_CAN_COPY",
-                message="仅预置 Agent 可复制",
-                status_code=400,
+                code="FORBIDDEN",
+                message="无权复制此 Agent",
+                status_code=403,
             )
 
         # 查询源 Agent 的工具关联
@@ -364,7 +364,7 @@ class AgentService:
         for tool_id in tool_ids:
             db.add(AgentTool(agent_id=new_agent.id, tool_id=tool_id))
 
-        await db.commit()
+        await db.flush()
         await db.refresh(new_agent)
         return new_agent
 

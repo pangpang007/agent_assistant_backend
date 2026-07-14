@@ -153,8 +153,8 @@ def decrypt_transport_field(value: str) -> str:
         ek = _b64d(payload["ek"])
         iv = _b64d(payload["iv"])
         ct = _b64d(payload["ct"])
-    except (KeyError, ValueError, json.JSONDecodeError) as e:
-        raise ValueError("传输密文格式无效") from e
+    except (KeyError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        raise ValueError("传输密文格式无效，请重新获取公钥后加密") from e
 
     private_key = _load_or_create_private_key()
     try:
@@ -169,7 +169,10 @@ def decrypt_transport_field(value: str) -> str:
         plain = AESGCM(aes_key).decrypt(iv, ct, None)
     except Exception as e:
         logger.warning("transport_decrypt_failed", error=str(e))
-        raise ValueError("传输密文解密失败") from e
+        # 常见于多 worker 未共享同一 TRANSPORT_RSA_PRIVATE_KEY_PEM
+        raise ValueError(
+            "传输密文解密失败，请重新调用 /api/crypto/public-key 后加密提交"
+        ) from e
 
     return plain.decode("utf-8")
 

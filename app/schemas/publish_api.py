@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class PublishApiRequest(BaseModel):
@@ -45,7 +45,12 @@ class PublishedApiListResponse(BaseModel):
 
 
 class TogglePublishedApiRequest(BaseModel):
-    is_active: bool
+    """is_active / enabled / active 均可；省略则由服务端翻转当前状态。"""
+
+    is_active: Optional[bool] = Field(
+        default=None,
+        validation_alias=AliasChoices("is_active", "enabled", "active"),
+    )
 
 
 class TogglePublishedApiResponse(BaseModel):

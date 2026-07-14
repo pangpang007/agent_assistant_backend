@@ -6,7 +6,7 @@ import uuid
 from typing import Optional
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
@@ -60,6 +60,18 @@ class VectorSearchService:
 
         # 校验知识库归属
         kb = await self._get_kb_with_permission(kb_id, user_id)
+
+        # 空知识库：不调用 Embedding，快速返回空结果
+        chunk_count = (
+            await self.db.execute(
+                select(func.count(KnowledgeChunk.id)).where(
+                    KnowledgeChunk.knowledge_base_id == kb_id,
+                    KnowledgeChunk.embedding.is_not(None),
+                )
+            )
+        ).scalar() or 0
+        if chunk_count == 0:
+            return {"query": query, "total": 0, "results": []}
 
         # Step 1: 查询向量化
         embedding_service = EmbeddingService(self.db)

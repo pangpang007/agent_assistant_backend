@@ -137,22 +137,28 @@ class PublishApiService:
         return {"items": items, "total": len(items)}
 
     async def toggle_api(
-        self, db: AsyncSession, user_id: str, workflow_id: str, is_active: bool
+        self,
+        db: AsyncSession,
+        user_id: str,
+        workflow_id: str,
+        is_active: bool | None = None,
     ) -> dict:
         workflow = await self._get_workflow_or_404(db, user_id, workflow_id)
 
         if not workflow.is_published_api:
             raise NotPublishedError()
 
-        workflow.api_is_active = is_active
-        if not is_active and workflow.published_api_key:
+        # 未传 is_active 时翻转当前状态
+        target = (not workflow.api_is_active) if is_active is None else is_active
+        workflow.api_is_active = target
+        if not target and workflow.published_api_key:
             await CacheInvalidator.invalidate_api_key(workflow.published_api_key)
 
         await db.flush()
-        status_text = "已启用" if is_active else "已停用"
+        status_text = "已启用" if target else "已停用"
         return {
             "workflow_id": str(workflow.id),
-            "is_active": is_active,
+            "is_active": target,
             "message": f"API {status_text}",
         }
 

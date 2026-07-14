@@ -3,7 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,7 +23,8 @@ class ModelProvider(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     provider_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="custom", server_default="custom"
     )
-    api_key_encrypted: Mapped[str] = mapped_column(String(1024), nullable=False)
+    # Fernet 密文可能超过 1024；使用 Text 避免写入时报错
+    api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     base_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     is_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"

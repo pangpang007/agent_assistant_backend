@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 # ==================== 工作流 CRUD ====================
@@ -116,7 +116,12 @@ class VersionDiffResponse(BaseModel):
 
 
 class TagVersionRequest(BaseModel):
-    tag: str = Field(..., min_length=1, max_length=100)
+    tag: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        validation_alias=AliasChoices("tag", "tag_name", "name"),
+    )
 
 
 class VersionTagResponse(BaseModel):

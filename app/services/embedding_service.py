@@ -64,6 +64,12 @@ class EmbeddingService:
 
         # 获取 API 配置
         api_key, base_url = await self._get_embedding_config(user_id, embedding_model)
+        if not api_key:
+            raise AppException(
+                code="EMBEDDING_NOT_CONFIGURED",
+                message="未配置 Embedding API Key，请先添加模型供应商或设置 DEFAULT_EMBEDDING_API_KEY",
+                status_code=400,
+            )
 
         # 分批处理
         all_embeddings = []

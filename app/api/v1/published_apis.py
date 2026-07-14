@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -23,12 +25,13 @@ async def list_published_apis(
 @router.put("/{workflow_id}/toggle")
 async def toggle_api(
     workflow_id: str,
-    body: TogglePublishedApiRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    body: Optional[TogglePublishedApiRequest] = Body(default=None),
 ):
     service = PublishApiService()
+    is_active = body.is_active if body else None
     data = await service.toggle_api(
-        db, str(current_user.id), workflow_id, body.is_active
+        db, str(current_user.id), workflow_id, is_active
     )
     return {"code": 0, "message": "success", "data": data}

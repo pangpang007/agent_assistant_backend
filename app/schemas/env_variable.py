@@ -4,15 +4,17 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.core.transport_crypto import SensitiveStr
+
 
 class EnvVarCreateRequest(BaseModel):
     key: str = Field(..., min_length=1, max_length=255, pattern=r"^[A-Z0-9_]+$")
-    value: str = Field(..., min_length=1, max_length=10000)
+    value: SensitiveStr = Field(..., min_length=1, max_length=10000)
     type: str = Field(default="string", pattern="^(string|secret)$")
 
 
 class EnvVarUpdateRequest(BaseModel):
-    value: Optional[str] = Field(default=None, min_length=1, max_length=10000)
+    value: Optional[SensitiveStr] = Field(default=None, min_length=1, max_length=10000)
     type: Optional[str] = Field(default=None, pattern="^(string|secret)$")
 
 

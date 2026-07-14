@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 
 from app.api.deps import CurrentUser, DBSession
 from app.schemas.template import (
@@ -70,12 +70,13 @@ async def get_template(
 @router.post("/{template_id}/use")
 async def use_template(
     template_id: UUID,
-    body: UseTemplateRequest,
     db: DBSession,
     user: CurrentUser,
+    body: Optional[UseTemplateRequest] = Body(default=None),
 ):
     service = TemplateService(db)
-    workflow = await service.use_template(template_id, user.id, body.name)
+    name_override = body.name if body else None
+    workflow = await service.use_template(template_id, user.id, name_override)
     return {"code": 0, "message": "success", "data": _workflow_detail(workflow)}
 
 

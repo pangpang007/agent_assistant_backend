@@ -149,7 +149,9 @@ class WorkflowService:
                 edges_data=workflow.edges_data,
             )
 
+        workflow.updated_at = datetime.now(timezone.utc)
         await self.db.flush()
+        await self.db.refresh(workflow)
         return workflow
 
     async def delete_workflow(self, workflow_id: UUID, user_id: UUID) -> None:
