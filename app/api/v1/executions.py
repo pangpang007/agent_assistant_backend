@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -23,7 +24,12 @@ async def list_executions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     workflow_id: Optional[uuid.UUID] = Query(None),
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query(
+        None,
+        pattern="^(pending|running|success|failed|paused|cancelled)$",
+    ),
+    start_time: Optional[datetime] = Query(None),
+    end_time: Optional[datetime] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -35,6 +41,29 @@ async def list_executions(
         page_size=page_size,
         workflow_id=workflow_id,
         status=status,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    return {
+        "code": 0,
+        "message": "success",
+        "data": result.model_dump(),
+    }
+
+
+@router.get("/stats")
+async def get_execution_stats(
+    workflow_id: Optional[uuid.UUID] = Query(None),
+    period: str = Query("7d", pattern="^(7d|30d|90d)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    redis = get_redis()
+    service = ExecutionService(db, redis)
+    result = await service.get_stats(
+        user_id=current_user.id,
+        period=period,
+        workflow_id=workflow_id,
     )
     return {
         "code": 0,
@@ -106,6 +135,7 @@ async def get_execution_logs(
 
 
 @router.post("/{execution_id}/cancel")
+@router.post("/{execution_id}/stop")
 async def cancel_execution(
     execution_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -134,6 +164,35 @@ async def submit_review(
     result = await service.submit_review(
         execution_id=execution_id,
         node_id=node_id,
+        user_id=current_user.id,
+        action=body.action,
+        comment=body.comment,
+        modified_data=body.modified_data,
+    )
+    return {
+        "code": 0,
+        "message": "success",
+        "data": result.model_dump(),
+    }
+
+
+@router.post("/{execution_id}/review")
+async def submit_review_compatible(
+    execution_id: uuid.UUID,
+    body: ReviewActionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """前端兼容路径：node_id 放在请求体。"""
+    if not body.node_id:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=422, detail="node_id is required")
+    redis = get_redis()
+    service = ExecutionService(db, redis)
+    result = await service.submit_review(
+        execution_id=execution_id,
+        node_id=body.node_id,
         user_id=current_user.id,
         action=body.action,
         comment=body.comment,

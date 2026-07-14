@@ -13,14 +13,17 @@ from app.core.redis import get_redis
 from app.models.user import User
 from app.schemas.workflow import (
     NodeTestRequest,
+    TagVersionRequest,
     ValidationResultResponse,
     WorkflowCreate,
     WorkflowImportRequest,
     WorkflowUpdate,
 )
 from app.schemas.execution import WorkflowRunRequest
+from app.schemas.template import SaveAsTemplateRequest, TemplateDetailResponse
 from app.services.execution_service import ExecutionService
 from app.services.node_test_service import NodeTestService
+from app.services.template_service import TemplateService
 from app.services.validation_service import ValidationService
 from app.services.version_service import VersionService
 from app.services.workflow_service import WorkflowService
@@ -226,6 +229,43 @@ async def rollback_version(
     return {"code": 0, "message": "success", "data": result}
 
 
+@router.post("/{workflow_id}/versions/{version_number}/tag")
+async def tag_version(
+    workflow_id: uuid.UUID,
+    version_number: int,
+    body: TagVersionRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    version_service = VersionService(db)
+    result = await version_service.tag_version(
+        workflow_id, version_number, body.tag, current_user.id
+    )
+    result["id"] = str(result["id"])
+    result["workflow_id"] = str(result["workflow_id"])
+    if result.get("created_at"):
+        result["created_at"] = result["created_at"].isoformat()
+    return {"code": 0, "message": "success", "data": result}
+
+
+@router.delete("/{workflow_id}/versions/{version_number}/tag")
+async def remove_tag(
+    workflow_id: uuid.UUID,
+    version_number: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    version_service = VersionService(db)
+    result = await version_service.remove_tag(
+        workflow_id, version_number, current_user.id
+    )
+    result["id"] = str(result["id"])
+    result["workflow_id"] = str(result["workflow_id"])
+    if result.get("created_at"):
+        result["created_at"] = result["created_at"].isoformat()
+    return {"code": 0, "message": "success", "data": result}
+
+
 @router.get("/{workflow_id}/versions/diff")
 async def diff_versions(
     workflow_id: uuid.UUID,
@@ -239,6 +279,26 @@ async def diff_versions(
     version_service = VersionService(db)
     diff = await version_service.diff_versions(workflow_id, v1, v2)
     return {"code": 0, "message": "success", "data": diff.model_dump()}
+
+
+@router.post("/{workflow_id}/save-as-template")
+async def save_as_template(
+    workflow_id: uuid.UUID,
+    body: SaveAsTemplateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    service = TemplateService(db)
+    template = await service.save_as_template(
+        workflow_id=workflow_id,
+        user_id=current_user.id,
+        name=body.name,
+        description=body.description,
+        category=body.category,
+        thumbnail_url=body.thumbnail_url,
+    )
+    data = TemplateDetailResponse.model_validate(template).model_dump()
+    return {"code": 0, "message": "success", "data": data}
 
 
 @router.post("/{workflow_id}/validate")

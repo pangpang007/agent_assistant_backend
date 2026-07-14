@@ -114,6 +114,22 @@ class VersionDiffResponse(BaseModel):
     modified_edges: list[dict]   # 修改的边
 
 
+class TagVersionRequest(BaseModel):
+    tag: str = Field(..., min_length=1, max_length=100)
+
+
+class VersionTagResponse(BaseModel):
+    id: uuid.UUID
+    workflow_id: uuid.UUID
+    version_number: int
+    tag: Optional[str] = None
+    node_count: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+
 # ==================== 工作流校验 ====================
 
 class ValidationIssue(BaseModel):

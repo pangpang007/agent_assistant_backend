@@ -42,9 +42,8 @@ class Workflow(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     executions = relationship(
         "Execution", back_populates="workflow", cascade="all, delete-orphan"
     )
-    template = relationship(
-        "Template", back_populates="workflow", uselist=False, cascade="all, delete-orphan"
-    )
+    templates = relationship("Template", back_populates="workflow")
+
 
 
 class WorkflowVersion(Base, UUIDPrimaryKeyMixin):

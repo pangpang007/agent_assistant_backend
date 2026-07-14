@@ -8,6 +8,7 @@ from app.api.v1 import (
     executions,
     health,
     knowledge,
+    logs,
     models,
     teams,
     templates,
@@ -30,7 +31,8 @@ api_router.include_router(tools.router, prefix="/tools", tags=["Tools"])
 api_router.include_router(knowledge.router, prefix="/knowledge", tags=["Knowledge"])
 api_router.include_router(models.router, prefix="/models", tags=["Models"])
 api_router.include_router(workflows.router, prefix="/workflows", tags=["Workflows"])
-api_router.include_router(templates.router, prefix="/v1/templates", tags=["Templates"])
-api_router.include_router(executions.router, prefix="/v1/executions", tags=["Executions"])
+api_router.include_router(templates.router, prefix="/templates", tags=["Templates"])
+api_router.include_router(executions.router, prefix="/executions", tags=["Executions"])
+api_router.include_router(logs.router, prefix="/logs", tags=["Logs"])
 api_router.include_router(ws.router, prefix="/ws", tags=["WebSocket"])
-api_router.include_router(env_vars.router, prefix="/v1/env-vars", tags=["Env Variables"])
+api_router.include_router(env_vars.router, prefix="/env-vars", tags=["Env Variables"])

@@ -2,10 +2,10 @@ import asyncio
 import json
 import uuid
 import structlog
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session_factory
@@ -19,15 +19,20 @@ from app.core.exceptions import (
     WorkflowNotFoundError,
 )
 from app.models.enums import ExecutionStatus, NodeStatus
-from app.models.execution import Execution, ExecutionNode
+from app.models.execution import Execution, ExecutionNode, Log
 from app.models.workflow import Workflow
 from app.schemas.execution import (
     CancelExecutionResponse,
+    DailyTrendItem,
     ExecutionDetailResponse,
     ExecutionListItem,
     ExecutionListResponse,
     ExecutionNodeDetail,
+    ExecutionStatsResponse,
+    ExecutionStatsSummary,
+    NodeStats,
     ReviewActionResponse,
+    WorkflowStatsItem,
 )
 from app.services.execution.cancellation import CancellationManager
 from app.services.execution.executor import CHECKPOINT_KEY_PREFIX, WorkflowExecutor
@@ -279,21 +284,34 @@ class ExecutionService:
         page_size: int = 20,
         workflow_id: Optional[uuid.UUID] = None,
         status: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
     ) -> ExecutionListResponse:
         query = (
             select(Execution, Workflow.name)
             .join(Workflow, Execution.workflow_id == Workflow.id)
             .where(Workflow.user_id == user_id)
         )
+        count_query = (
+            select(func.count(Execution.id))
+            .join(Workflow, Execution.workflow_id == Workflow.id)
+            .where(Workflow.user_id == user_id)
+        )
 
         if workflow_id:
             query = query.where(Execution.workflow_id == workflow_id)
+            count_query = count_query.where(Execution.workflow_id == workflow_id)
         if status:
             query = query.where(Execution.status == status)
+            count_query = count_query.where(Execution.status == status)
+        if start_time:
+            query = query.where(Execution.started_at >= start_time)
+            count_query = count_query.where(Execution.started_at >= start_time)
+        if end_time:
+            query = query.where(Execution.started_at <= end_time)
+            count_query = count_query.where(Execution.started_at <= end_time)
 
-        count_query = select(func.count()).select_from(query.subquery())
         total = (await self.db.execute(count_query)).scalar() or 0
-
         offset = (page - 1) * page_size
         query = (
             query.order_by(Execution.started_at.desc())
@@ -302,20 +320,39 @@ class ExecutionService:
         )
         rows = (await self.db.execute(query)).all()
 
-        items = [
-            ExecutionListItem(
-                id=execution.id,
-                workflow_id=execution.workflow_id,
-                workflow_name=workflow_name,
-                version_number=execution.version_number,
-                status=execution.status.value,
-                total_duration_ms=execution.total_duration_ms,
-                total_tokens=execution.total_tokens,
-                started_at=execution.started_at,
-                finished_at=execution.finished_at,
+        items: list[ExecutionListItem] = []
+        for execution, workflow_name in rows:
+            node_stats_result = await self.db.execute(
+                select(
+                    func.count(ExecutionNode.id),
+                    func.count(ExecutionNode.id).filter(
+                        ExecutionNode.status == NodeStatus.success
+                    ),
+                    func.count(ExecutionNode.id).filter(
+                        ExecutionNode.status == NodeStatus.failed
+                    ),
+                ).where(ExecutionNode.execution_id == execution.id)
             )
-            for execution, workflow_name in rows
-        ]
+            node_total, node_success, node_failed = node_stats_result.one()
+            items.append(
+                ExecutionListItem(
+                    id=execution.id,
+                    workflow_id=execution.workflow_id,
+                    workflow_name=workflow_name,
+                    version_number=execution.version_number,
+                    status=execution.status.value,
+                    total_duration_ms=execution.total_duration_ms,
+                    total_tokens=execution.total_tokens,
+                    total_cost=float(execution.total_cost)
+                    if execution.total_cost is not None
+                    else None,
+                    started_at=execution.started_at,
+                    finished_at=execution.finished_at,
+                    node_count=node_total or 0,
+                    success_node_count=node_success or 0,
+                    failed_node_count=node_failed or 0,
+                )
+            )
 
         return ExecutionListResponse(
             items=items,
@@ -345,23 +382,38 @@ class ExecutionService:
         )
         exec_nodes = nodes_result.scalars().all()
 
-        node_details = [
-            ExecutionNodeDetail(
-                id=n.id,
-                execution_id=n.execution_id,
-                node_id=n.node_id,
-                node_type=n.node_type,
-                status=n.status.value,
-                input_data=n.input_data,
-                output_data=n.output_data,
-                duration_ms=n.duration_ms,
-                tokens_used=n.tokens_used,
-                error_message=n.error_message,
-                started_at=n.started_at,
-                finished_at=n.finished_at,
+        stats = NodeStats()
+        node_details: list[ExecutionNodeDetail] = []
+        for n in exec_nodes:
+            status_val = n.status.value if hasattr(n.status, "value") else str(n.status)
+            stats.total += 1
+            if hasattr(stats, status_val):
+                setattr(stats, status_val, getattr(stats, status_val) + 1)
+            node_details.append(
+                ExecutionNodeDetail(
+                    id=n.id,
+                    execution_id=n.execution_id,
+                    node_id=n.node_id,
+                    node_type=n.node_type,
+                    status=status_val,
+                    input_data=n.input_data,
+                    output_data=n.output_data,
+                    duration_ms=n.duration_ms,
+                    tokens_used=n.tokens_used,
+                    error_message=n.error_message,
+                    started_at=n.started_at,
+                    finished_at=n.finished_at,
+                )
             )
-            for n in exec_nodes
-        ]
+
+        success_rate = (
+            round(stats.success / stats.total, 2) if stats.total > 0 else 0.0
+        )
+        log_count = (
+            await self.db.execute(
+                select(func.count(Log.id)).where(Log.execution_id == execution_id)
+            )
+        ).scalar() or 0
 
         return ExecutionDetailResponse(
             id=execution.id,
@@ -373,10 +425,15 @@ class ExecutionService:
             output_data=execution.output_data,
             total_duration_ms=execution.total_duration_ms,
             total_tokens=execution.total_tokens,
-            total_cost=execution.total_cost,
+            total_cost=float(execution.total_cost)
+            if execution.total_cost is not None
+            else None,
             started_at=execution.started_at,
             finished_at=execution.finished_at,
             nodes=node_details,
+            node_stats=stats,
+            success_rate=success_rate,
+            log_count=log_count,
         )
 
     async def get_execution_nodes(
@@ -386,3 +443,117 @@ class ExecutionService:
     ) -> list[ExecutionNodeDetail]:
         detail = await self.get_execution_detail(execution_id, user_id)
         return detail.nodes
+
+    async def get_stats(
+        self,
+        user_id: uuid.UUID,
+        period: str = "7d",
+        workflow_id: Optional[uuid.UUID] = None,
+    ) -> ExecutionStatsResponse:
+        now = datetime.now(timezone.utc)
+        period_map = {"7d": 7, "30d": 30, "90d": 90}
+        days = period_map.get(period, 7)
+        start_time = now - timedelta(days=days)
+
+        base_filter = and_(
+            Workflow.user_id == user_id,
+            Execution.started_at >= start_time,
+        )
+        if workflow_id:
+            base_filter = and_(base_filter, Execution.workflow_id == workflow_id)
+
+        summary_query = (
+            select(
+                func.count(Execution.id).label("total"),
+                func.count(Execution.id)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("success"),
+                func.count(Execution.id)
+                .filter(Execution.status == ExecutionStatus.failed)
+                .label("failed"),
+                func.avg(Execution.total_duration_ms)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("avg_duration"),
+                func.coalesce(func.sum(Execution.total_tokens), 0).label("total_tokens"),
+                func.coalesce(func.sum(Execution.total_cost), 0).label("total_cost"),
+            )
+            .join(Workflow, Execution.workflow_id == Workflow.id)
+            .where(base_filter)
+        )
+        summary_row = (await self.db.execute(summary_query)).one()
+
+        total = summary_row.total or 0
+        success = summary_row.success or 0
+        summary = ExecutionStatsSummary(
+            total_executions=total,
+            success_count=success,
+            failed_count=summary_row.failed or 0,
+            success_rate=round(success / total, 2) if total > 0 else 0.0,
+            avg_duration_ms=round(summary_row.avg_duration or 0),
+            total_tokens=int(summary_row.total_tokens or 0),
+            total_cost=float(summary_row.total_cost or 0),
+        )
+
+        daily_query = (
+            select(
+                func.date(Execution.started_at).label("date"),
+                func.count(Execution.id).label("count"),
+                func.count(Execution.id)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("success_count"),
+                func.avg(Execution.total_duration_ms)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("avg_duration"),
+            )
+            .join(Workflow, Execution.workflow_id == Workflow.id)
+            .where(base_filter)
+            .group_by(func.date(Execution.started_at))
+            .order_by(func.date(Execution.started_at))
+        )
+        daily_trend = [
+            DailyTrendItem(
+                date=str(row.date),
+                count=row.count,
+                success_count=row.success_count or 0,
+                avg_duration_ms=round(row.avg_duration or 0),
+            )
+            for row in (await self.db.execute(daily_query)).all()
+        ]
+
+        by_wf_query = (
+            select(
+                Workflow.id.label("workflow_id"),
+                Workflow.name.label("workflow_name"),
+                func.count(Execution.id).label("count"),
+                func.count(Execution.id)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("success_count"),
+                func.avg(Execution.total_duration_ms)
+                .filter(Execution.status == ExecutionStatus.success)
+                .label("avg_duration"),
+            )
+            .join(Workflow, Execution.workflow_id == Workflow.id)
+            .where(
+                and_(Workflow.user_id == user_id, Execution.started_at >= start_time)
+            )
+            .group_by(Workflow.id, Workflow.name)
+            .order_by(func.count(Execution.id).desc())
+            .limit(10)
+        )
+        by_workflow = [
+            WorkflowStatsItem(
+                workflow_id=str(row.workflow_id),
+                workflow_name=row.workflow_name,
+                execution_count=row.count,
+                success_count=row.success_count or 0,
+                avg_duration_ms=round(row.avg_duration or 0),
+            )
+            for row in (await self.db.execute(by_wf_query)).all()
+        ]
+
+        return ExecutionStatsResponse(
+            summary=summary,
+            daily_trend=daily_trend,
+            by_workflow=by_workflow,
+        )
+

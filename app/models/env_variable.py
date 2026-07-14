@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String, Text
+from sqlalchemy import Enum, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,3 +27,7 @@ class EnvVariable(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
 
     user = relationship("User", back_populates="env_variables")
+
+    __table_args__ = (
+        Index("uq_env_variables_user_key", "user_id", "key", unique=True),
+    )

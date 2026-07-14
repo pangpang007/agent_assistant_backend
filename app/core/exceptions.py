@@ -124,3 +124,76 @@ class InvalidReviewNodeError(AppException):
             message="无效的审核节点",
             status_code=400,
         )
+
+
+class TemplateNotFoundError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="TEMPLATE_NOT_FOUND",
+            message="模板不存在",
+            status_code=404,
+        )
+
+
+class PresetTemplateProtectedError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="PRESET_TEMPLATE_PROTECTED",
+            message="预置模板不可删除/修改",
+            status_code=403,
+        )
+
+
+class NoTagToRemoveError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="NO_TAG_TO_REMOVE",
+            message="该版本没有标签可删除",
+            status_code=400,
+        )
+
+
+class LogNotFoundError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="LOG_NOT_FOUND",
+            message="日志不存在",
+            status_code=404,
+        )
+
+
+class EnvVarNotFoundError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="ENV_VAR_NOT_FOUND",
+            message="环境变量不存在",
+            status_code=404,
+        )
+
+
+class EnvVarKeyExistsError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="ENV_VAR_KEY_EXISTS",
+            message="变量名已存在",
+            status_code=409,
+        )
+
+
+class EnvVarKeyFormatError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="ENV_VAR_KEY_FORMAT",
+            message="变量名格式不合法，只允许大写字母、数字和下划线",
+            status_code=422,
+        )
+
+
+class EnvVarTypeImmutableError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="ENV_VAR_TYPE_IMMUTABLE",
+            message="不允许修改变量类型",
+            status_code=400,
+        )
+

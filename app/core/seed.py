@@ -4,12 +4,16 @@
 幂等设计：检查 is_preset=True 的记录是否已存在，已存在则跳过。
 """
 
+import uuid
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agent import Agent
+from app.models.template import Template
 from app.models.tool import Tool
+from app.seeds.preset_templates import PRESET_TEMPLATES
 
 logger = structlog.get_logger()
 
@@ -253,6 +257,7 @@ async def seed_preset_data(db: AsyncSession) -> None:
     """
     await _seed_preset_agents(db)
     await _seed_preset_tools(db)
+    await _seed_preset_templates(db)
     await db.commit()
     logger.info("preset_data_seeded")
 
@@ -296,3 +301,34 @@ async def _seed_preset_tools(db: AsyncSession) -> None:
         db.add(tool)
 
     logger.info("preset_tools_created", count=len(PRESET_TOOLS))
+
+
+async def _seed_preset_templates(db: AsyncSession) -> None:
+    """插入预置模板（按固定 UUID 幂等）。"""
+    created = 0
+    for tpl in PRESET_TEMPLATES:
+        tpl_id = uuid.UUID(tpl["id"]) if isinstance(tpl["id"], str) else tpl["id"]
+        existing = await db.get(Template, tpl_id)
+        if existing is not None:
+            continue
+        db.add(
+            Template(
+                id=tpl_id,
+                user_id=None,
+                workflow_id=None,
+                name=tpl["name"],
+                description=tpl.get("description"),
+                category=tpl["category"],
+                thumbnail_url=tpl.get("thumbnail_url"),
+                use_count=tpl.get("use_count", 0),
+                is_preset=True,
+                nodes_data=tpl.get("nodes_data") or [],
+                edges_data=tpl.get("edges_data") or [],
+            )
+        )
+        created += 1
+
+    if created == 0:
+        logger.info("preset_templates_already_exist, skip")
+    else:
+        logger.info("preset_templates_created", count=created)
