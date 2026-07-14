@@ -25,6 +25,7 @@ docs/
 | [Phase 2](phase2/README.md) | Agent / Tool / Model 管理 | 已完成 |
 | [Phase 3](phase3/README.md) | 知识库管理（RAG） | 已完成 |
 | [Phase 4](phase4/README.md) | 工作流编辑器后端 | 已完成 |
+| [Phase 5](phase5/README.md) | 工作流执行引擎 | 已完成 |
 
 ## 文档规范
 

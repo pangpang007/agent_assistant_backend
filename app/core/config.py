@@ -70,5 +70,10 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 20
     embedding_request_timeout: int = 60
 
+    # Phase 5: Workflow Execution
+    execution_max_concurrent: int = 10
+    execution_default_timeout: int = 300
+    review_default_timeout: int = 3600
+
 
 settings = Settings()

@@ -13,7 +13,10 @@ from .loop_executor import LoopExecutor
 from .parallel_executor import ParallelExecutor
 from .delay_executor import DelayExecutor
 from .aggregate_executor import VariableAggregateExecutor
-from .mock_executor import MockExecutor
+from .start_executor import StartExecutor
+from .end_executor import EndExecutor
+from .review_executor import ReviewExecutor
+from .test_executor import TestExecutor
 
 
 class NodeExecutorRegistry:
@@ -32,11 +35,10 @@ class NodeExecutorRegistry:
         NodeType.parallel.value: ParallelExecutor,
         NodeType.delay.value: DelayExecutor,
         NodeType.variable_aggregate.value: VariableAggregateExecutor,
-        # startNode, endNode, reviewNode, testNode → MockExecutor
-        NodeType.start.value: MockExecutor,
-        NodeType.end.value: MockExecutor,
-        NodeType.review.value: MockExecutor,
-        NodeType.test.value: MockExecutor,
+        NodeType.start.value: StartExecutor,
+        NodeType.end.value: EndExecutor,
+        NodeType.review.value: ReviewExecutor,
+        NodeType.test.value: TestExecutor,
     }
 
     @classmethod

@@ -18,6 +18,8 @@ from app.schemas.workflow import (
     WorkflowImportRequest,
     WorkflowUpdate,
 )
+from app.schemas.execution import WorkflowRunRequest
+from app.services.execution_service import ExecutionService
 from app.services.node_test_service import NodeTestService
 from app.services.validation_service import ValidationService
 from app.services.version_service import VersionService
@@ -259,6 +261,31 @@ async def validate_workflow(
         issues=issues,
     )
     return {"code": 0, "message": "success", "data": result.model_dump()}
+
+
+@router.post("/{workflow_id}/run")
+async def run_workflow(
+    workflow_id: uuid.UUID,
+    body: WorkflowRunRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    redis = get_redis()
+    service = ExecutionService(db, redis)
+    execution = await service.start_execution(
+        workflow_id=workflow_id,
+        user_id=current_user.id,
+        input_data=body.input_data,
+    )
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "execution_id": str(execution.id),
+            "status": execution.status.value,
+            "message": "工作流已开始执行",
+        },
+    }
 
 
 @router.post("/{workflow_id}/nodes/test")

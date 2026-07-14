@@ -79,3 +79,48 @@ class InvalidImportFormatError(AppException):
             message="导入 JSON 格式不合法",
             status_code=400,
         )
+
+
+class ExecutionNotFoundError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="EXECUTION_NOT_FOUND",
+            message="执行记录不存在",
+            status_code=404,
+        )
+
+
+class ExecutionNotCancellableError(AppException):
+    def __init__(self, status: str):
+        super().__init__(
+            code="EXECUTION_NOT_CANCELLABLE",
+            message=f"当前状态不可取消: {status}",
+            status_code=400,
+        )
+
+
+class ExecutionNotPausedError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="EXECUTION_NOT_PAUSED",
+            message="执行未在暂停状态",
+            status_code=400,
+        )
+
+
+class WorkflowEmptyError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="WORKFLOW_EMPTY",
+            message="工作流无节点或边数据",
+            status_code=400,
+        )
+
+
+class InvalidReviewNodeError(AppException):
+    def __init__(self):
+        super().__init__(
+            code="INVALID_REVIEW_NODE",
+            message="无效的审核节点",
+            status_code=400,
+        )
