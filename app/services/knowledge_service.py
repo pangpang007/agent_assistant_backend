@@ -128,8 +128,8 @@ class KnowledgeService:
         deleted_chunks = chunk_count_result.scalar() or 0
 
         # 删除数据库记录
-        db.delete(kb)  # cascade 自动删除 documents 和 chunks
-        await db.commit()
+        await db.delete(kb)  # cascade 自动删除 documents 和 chunks
+        await db.flush()
 
         # 删除物理文件（数据库删除成功后再删文件）
         for doc_id, file_path in docs:
@@ -365,7 +365,7 @@ class KnowledgeService:
         file_size = doc.file_size
 
         # 删除数据库记录
-        db.delete(doc)
+        await db.delete(doc)
 
         # 更新知识库统计
         await db.execute(

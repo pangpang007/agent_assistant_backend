@@ -158,7 +158,7 @@ class WorkflowService:
         workflow = await self.get_workflow(workflow_id, user_id)
         if workflow.published_api_key:
             await CacheInvalidator.invalidate_api_key(workflow.published_api_key)
-        self.db.delete(workflow)
+        await self.db.delete(workflow)
         await self.db.flush()
         await CacheInvalidator.invalidate_dashboard(str(user_id))
         await CacheInvalidator.invalidate_search(str(user_id))

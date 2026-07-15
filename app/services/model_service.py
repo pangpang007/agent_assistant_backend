@@ -194,8 +194,8 @@ class ModelService:
                 )
 
         affected_models = len(model_ids)
-        db.delete(provider)  # cascade 自动删除 models
-        await db.commit()
+        await db.delete(provider)  # cascade 自动删除 models
+        await db.flush()
 
         return {
             "message": "供应商已删除",
@@ -378,8 +378,8 @@ class ModelService:
                 status_code=400,
             )
 
-        db.delete(model)
-        await db.commit()
+        await db.delete(model)
+        await db.flush()
 
     @staticmethod
     async def set_default_model(

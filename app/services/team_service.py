@@ -168,8 +168,8 @@ class TeamService:
         owner_user.team_id = None
         owner_user.account_type = "personal"
 
-        db.delete(team)
-        await db.commit()
+        await db.delete(team)
+        await db.flush()
         return affected_count
 
     @staticmethod

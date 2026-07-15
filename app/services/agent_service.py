@@ -314,8 +314,8 @@ class AgentService:
         if agent.user_id != current_user.id:
             raise AppException(code="FORBIDDEN", message="无权删除此 Agent", status_code=403)
 
-        db.delete(agent)
-        await db.commit()
+        await db.delete(agent)
+        await db.flush()
 
     @staticmethod
     async def copy_agent(
