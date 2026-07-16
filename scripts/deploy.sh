@@ -42,7 +42,12 @@ init_env() {
 pull_code() {
   if [[ -d .git ]]; then
     log "拉取最新代码..."
-    sudo git pull --ff-only
+    # 不要用 sudo 拉代码：root 没有当前用户的 SSH/凭据，会卡在认证
+    if [[ -n "${SUDO_USER:-}" ]]; then
+      sudo -u "$SUDO_USER" git -C "$ROOT_DIR" pull --ff-only
+    else
+      git pull --ff-only
+    fi
   else
     log "非 git 目录，跳过 git pull"
   fi
