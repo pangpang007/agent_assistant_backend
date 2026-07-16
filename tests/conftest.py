@@ -90,7 +90,7 @@ async def team_owner(db_session: AsyncSession) -> User:
 
 @pytest_asyncio.fixture
 async def auth_headers(test_user: User) -> dict:
-    token = create_access_token(
+    token, _ = create_access_token(
         user_id=str(test_user.id),
         email=test_user.email,
         account_type=test_user.account_type,
@@ -102,7 +102,7 @@ async def auth_headers(test_user: User) -> dict:
 
 @pytest_asyncio.fixture
 async def owner_headers(team_owner: User) -> dict:
-    token = create_access_token(
+    token, _ = create_access_token(
         user_id=str(team_owner.id),
         email=team_owner.email,
         account_type=team_owner.account_type,

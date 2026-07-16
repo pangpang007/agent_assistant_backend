@@ -52,6 +52,16 @@ class RefreshRequest(BaseModel):
     refresh_token: str | None = None
 
 
+class TokenStatusResponse(BaseModel):
+    is_valid: bool
+    user_id: str | None = None
+    access_token_expires_at: int | None = None
+    access_token_remaining_seconds: int | None = None
+    access_token_needs_refresh: bool = False
+    refresh_token_valid: bool = False
+    refresh_token_expires_at: int | None = None
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: SensitiveStr = Field(..., min_length=1)
     new_password: SensitiveStr = Field(..., min_length=8, max_length=128)

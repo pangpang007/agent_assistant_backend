@@ -36,6 +36,19 @@ class ForbiddenException(AppException):
         super().__init__(code="FORBIDDEN", message=message, status_code=403)
 
 
+class AuthError(AppException):
+    """Cookie / JWT 认证错误（Phase 8）"""
+
+    def __init__(self, code: str, message: str, status_code: int = 401):
+        super().__init__(code=code, message=message, status_code=status_code)
+
+
+TOKEN_EXPIRED = AuthError("TOKEN_EXPIRED", "Token 已过期，请重新登录")
+TOKEN_BLACKLISTED = AuthError("TOKEN_BLACKLISTED", "Token 已被吊销")
+COOKIE_MISSING = AuthError("COOKIE_MISSING", "缺少认证 cookie")
+TOKEN_INVALID = AuthError("TOKEN_INVALID", "Token 无效")
+
+
 class WorkflowNotFoundError(AppException):
     def __init__(self):
         super().__init__(

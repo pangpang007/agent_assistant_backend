@@ -1,47 +1,93 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import ForbiddenException, UnauthorizedException
-from app.core.security import decode_token, is_token_blacklisted
+from app.core.exceptions import AuthError, ForbiddenException, UnauthorizedException
+from app.core.security import (
+    decode_token,
+    get_token_type,
+    is_token_blacklisted,
+    try_decode_token,
+)
 from app.models.team import Team
 from app.models.user import User
 
 security_scheme = HTTPBearer(auto_error=False)
 
 
+async def get_current_user_id(request: Request) -> str:
+    """
+    从 request.state 获取当前用户 ID（由 AuthMiddleware 注入）。
+    过渡期：若中间件未注入，回退解析 Cookie / Authorization header。
+    """
+    user_id = getattr(request.state, "user_id", None)
+    if user_id:
+        return str(user_id)
+
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        raise AuthError(code="COOKIE_MISSING", message="未认证")
+
+    payload = try_decode_token(token)
+    if payload is None:
+        raise AuthError(code="TOKEN_INVALID", message="无效或过期的 Token")
+
+    if get_token_type(payload) != "access":
+        raise AuthError(code="TOKEN_INVALID", message="Token 类型不正确")
+
+    if await is_token_blacklisted(token):
+        raise AuthError(code="TOKEN_BLACKLISTED", message="Token 已被吊销")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise AuthError(code="TOKEN_INVALID", message="无效 Token")
+
+    return str(user_id)
+
+
 async def get_current_user(
+    request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(security_scheme)
     ],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
-    if credentials is None:
-        raise UnauthorizedException("未授权，请先登录")
+    user_id_str = getattr(request.state, "user_id", None)
 
-    token = credentials.credentials
+    if not user_id_str:
+        token = request.cookies.get("access_token")
+        if not token and credentials is not None:
+            token = credentials.credentials
 
-    payload = decode_token(token)
-    if payload is None:
-        raise UnauthorizedException("无效或过期的 Token")
+        if not token:
+            raise UnauthorizedException("未授权，请先登录")
 
-    if payload.get("type") != "access":
-        raise UnauthorizedException("Token 类型不正确")
+        payload = try_decode_token(token)
+        if payload is None:
+            raise UnauthorizedException("无效或过期的 Token")
 
-    if await is_token_blacklisted(token):
-        raise UnauthorizedException("Token 已被撤销")
+        if get_token_type(payload) != "access":
+            raise UnauthorizedException("Token 类型不正确")
 
-    user_id_str = payload.get("sub")
-    if user_id_str is None:
-        raise UnauthorizedException("无效 Token")
+        if await is_token_blacklisted(token):
+            raise UnauthorizedException("Token 已被撤销")
+
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
+            raise UnauthorizedException("无效 Token")
 
     try:
-        user_id = uuid.UUID(user_id_str)
+        user_id = uuid.UUID(str(user_id_str))
     except ValueError:
         raise UnauthorizedException("无效 Token")
 

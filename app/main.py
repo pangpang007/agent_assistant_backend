@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.redis import close_redis, init_redis
 from app.middleware import setup_cors, setup_security_middleware
+from app.middleware.auth import AuthMiddleware
 from app.middleware.error_handler import setup_error_handlers
 from app.middleware.request_log import RequestLogMiddleware
 
@@ -44,10 +45,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Middleware order (last added = outermost):
-# RequestLog → security (body/headers/rate) → CORS
+# Middleware order (last added = outermost / runs first on request):
+# RequestLog → security → Auth → CORS
 app.add_middleware(RequestLogMiddleware)
 setup_security_middleware(app)
+app.add_middleware(AuthMiddleware)
 setup_cors(app)
 setup_error_handlers(app)
 

@@ -1,25 +1,26 @@
 """认证服务：处理注册、登录、token 刷新、登出"""
 
 import uuid
-from datetime import datetime, timezone
 
+from jose import ExpiredSignatureError, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import AppException
+from app.core.exceptions import AppException, AuthError
 from app.core.security import (
-    blacklist_token,
-    create_access_token,
-    create_refresh_token,
+    create_token_pair,
+    create_token_pair_from_claims,
     decode_token,
+    decode_token_unverified_exp,
     generate_invite_code,
+    get_token_type,
     hash_password,
-    is_token_blacklisted,
     verify_password,
 )
 from app.models.team import Team
 from app.models.user import User
+from app.services.token_blacklist import TokenBlacklistService
 
 
 class AuthService:
@@ -77,14 +78,7 @@ class AuthService:
         if team:
             await db.refresh(team)
 
-        access_token = create_access_token(
-            user_id=str(user.id),
-            email=user.email,
-            account_type=user.account_type,
-            team_id=str(user.team_id) if user.team_id else None,
-            username=user.username,
-        )
-        refresh_token = create_refresh_token(
+        access_token, access_payload, refresh_token, refresh_payload = create_token_pair(
             user_id=str(user.id),
             email=user.email,
             account_type=user.account_type,
@@ -97,6 +91,8 @@ class AuthService:
             "team": team,
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "access_payload": access_payload,
+            "refresh_payload": refresh_payload,
         }
 
     @staticmethod
@@ -125,14 +121,7 @@ class AuthService:
                 status_code=401,
             )
 
-        access_token = create_access_token(
-            user_id=str(user.id),
-            email=user.email,
-            account_type=user.account_type,
-            team_id=str(user.team_id) if user.team_id else None,
-            username=user.username,
-        )
-        refresh_token = create_refresh_token(
+        access_token, access_payload, refresh_token, refresh_payload = create_token_pair(
             user_id=str(user.id),
             email=user.email,
             account_type=user.account_type,
@@ -144,35 +133,36 @@ class AuthService:
             "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "access_payload": access_payload,
+            "refresh_payload": refresh_payload,
         }
 
     @staticmethod
     async def refresh_token(db: AsyncSession, token: str) -> dict:
-        payload = decode_token(token)
-        if payload is None:
-            raise AppException(
-                code="INVALID_TOKEN",
-                message="Token 无效或已过期",
-                status_code=401,
+        try:
+            payload = decode_token(token)
+        except ExpiredSignatureError:
+            raise AuthError(
+                code="TOKEN_EXPIRED",
+                message="refresh_token 已过期，请重新登录",
             )
+        except JWTError:
+            raise AuthError(code="TOKEN_INVALID", message="refresh_token 无效")
 
-        if payload.get("type") != "refresh":
+        if get_token_type(payload) != "refresh":
             raise AppException(
                 code="INVALID_TOKEN_TYPE",
                 message="需要 refresh_token",
                 status_code=401,
             )
 
-        if await is_token_blacklisted(token):
-            raise AppException(
-                code="TOKEN_REVOKED",
-                message="Token 已被撤销",
-                status_code=401,
-            )
+        jti = payload.get("jti")
+        if jti and await TokenBlacklistService.is_blacklisted(jti):
+            raise AuthError(code="TOKEN_BLACKLISTED", message="Token 已被吊销")
 
         user_id_str = payload.get("sub")
         if user_id_str is None:
-            raise AppException(code="INVALID_TOKEN", message="无效 Token", status_code=401)
+            raise AuthError(code="TOKEN_INVALID", message="无效 Token")
 
         result = await db.execute(select(User).where(User.id == uuid.UUID(user_id_str)))
         user = result.scalar_one_or_none()
@@ -184,25 +174,45 @@ class AuthService:
                 status_code=401,
             )
 
-        access_token = create_access_token(
-            user_id=str(user.id),
-            email=user.email,
-            account_type=user.account_type,
-            team_id=str(user.team_id) if user.team_id else None,
-            username=user.username,
+        if jti:
+            await TokenBlacklistService.blacklist(jti, int(payload["exp"]))
+
+        access_token, access_payload, refresh_token, refresh_payload = (
+            create_token_pair_from_claims(
+                {
+                    "sub": str(user.id),
+                    "email": user.email,
+                    "account_type": user.account_type,
+                    "team_id": str(user.team_id) if user.team_id else None,
+                    "username": user.username,
+                }
+            )
         )
 
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
+            "access_payload": access_payload,
+            "refresh_payload": refresh_payload,
             "expires_in": settings.jwt_access_token_expire_minutes * 60,
+            "message": "Token 已刷新",
         }
 
     @staticmethod
-    async def logout(token: str, payload: dict) -> None:
-        exp_timestamp = payload.get("exp")
-        if exp_timestamp:
-            expires_at = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-            await blacklist_token(token, expires_at)
+    async def logout(
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+    ) -> None:
+        for token in (access_token, refresh_token):
+            if not token:
+                continue
+            payload = decode_token_unverified_exp(token)
+            if not payload:
+                continue
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                await TokenBlacklistService.blacklist(jti, int(exp))
 
     @staticmethod
     async def _generate_unique_invite_code(db: AsyncSession) -> str:

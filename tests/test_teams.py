@@ -39,7 +39,7 @@ class TestTeams:
         await db_session.commit()
         await db_session.refresh(user)
 
-        token = create_access_token(
+        token, _ = create_access_token(
             user_id=str(user.id),
             email=user.email,
             account_type="personal",

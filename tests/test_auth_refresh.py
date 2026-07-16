@@ -6,7 +6,7 @@ from app.core.security import create_refresh_token
 @pytest.mark.asyncio
 class TestRefresh:
     async def test_refresh_success(self, client, test_user):
-        refresh_token = create_refresh_token(
+        refresh_token, _ = create_refresh_token(
             user_id=str(test_user.id),
             email=test_user.email,
             account_type=test_user.account_type,
@@ -19,6 +19,9 @@ class TestRefresh:
         )
         assert response.status_code == 200
         assert "access_token" in response.json()["data"]
+        assert "refresh_token" in response.json()["data"]
+        assert "access_token" in response.cookies
+        assert "refresh_token" in response.cookies
 
     async def test_refresh_with_access_token(self, client, auth_headers):
         token = auth_headers["Authorization"].replace("Bearer ", "")

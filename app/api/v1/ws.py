@@ -6,10 +6,11 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.core.database import async_session_factory
-from app.core.security import decode_token
+from app.core.security import get_token_type, try_decode_token
 from app.models.execution import Execution
 from app.models.workflow import Workflow
 from app.services.execution.ws_broadcaster import ws_manager
+from app.services.token_blacklist import TokenBlacklistService
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -25,9 +26,14 @@ async def execution_ws(
     WebSocket 实时推送工作流执行状态。
     路径: /api/ws/executions/{execution_id}
     """
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
+    payload = try_decode_token(token)
+    if not payload or get_token_type(payload) != "access":
         await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    jti = payload.get("jti")
+    if jti and await TokenBlacklistService.is_blacklisted(jti):
+        await websocket.close(code=4001, reason="Token revoked")
         return
 
     user_id_str = payload.get("sub")
