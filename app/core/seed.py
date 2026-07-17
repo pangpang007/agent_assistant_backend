@@ -254,53 +254,131 @@ PRESET_TOOLS = [
 async def seed_preset_data(db: AsyncSession) -> None:
     """
     初始化预置数据。幂等设计，重复执行不会重复插入。
+    使用 advisory lock，避免多 worker 启动时竞态重复插入。
     """
-    await _seed_preset_agents(db)
-    await _seed_preset_tools(db)
-    await _seed_preset_templates(db)
-    await db.commit()
-    logger.info("preset_data_seeded")
+    from sqlalchemy import text
+
+    locked = await db.execute(text("SELECT pg_try_advisory_lock(84201501)"))
+    if not locked.scalar():
+        logger.info("preset_seed_skipped_another_worker_holds_lock")
+        return
+
+    try:
+        await _seed_preset_agents(db)
+        await _seed_preset_tools(db)
+        await _seed_preset_templates(db)
+        await db.commit()
+        logger.info("preset_data_seeded")
+    finally:
+        await db.execute(text("SELECT pg_advisory_unlock(84201501)"))
+        await db.commit()
 
 
 async def _seed_preset_agents(db: AsyncSession) -> None:
-    """插入预置 Agent（如已存在则跳过）"""
-    # 检查是否已有预置 Agent
-    result = await db.execute(
-        select(Agent).where(Agent.is_preset == True).limit(1)
+    """
+    插入预置 Agent。
+
+    - 按 name 幂等：已存在同名预置则跳过
+    - 启动时清理同名重复预置（多 worker 竞态历史脏数据）
+    """
+    await _dedupe_preset_agents(db)
+
+    existing = await db.execute(
+        select(Agent.name).where(Agent.is_preset == True)
     )
-    if result.scalar_one_or_none() is not None:
-        logger.info("preset_agents_already_exist, skip")
-        return
+    existing_names = {row[0] for row in existing.all()}
 
+    created = 0
     for agent_data in PRESET_AGENTS:
-        agent = Agent(
-            user_id=None,  # 预置 Agent 不属于任何用户，但 FK nullable 需要调整
-            is_preset=True,
-            **agent_data,
+        if agent_data["name"] in existing_names:
+            continue
+        db.add(
+            Agent(
+                user_id=None,
+                is_preset=True,
+                **agent_data,
+            )
         )
-        db.add(agent)
+        created += 1
 
-    logger.info("preset_agents_created", count=len(PRESET_AGENTS))
+    if created == 0:
+        logger.info("preset_agents_already_exist, skip")
+    else:
+        logger.info("preset_agents_created", count=created)
+
+
+async def _dedupe_preset_agents(db: AsyncSession) -> None:
+    """同名预置 Agent 只保留最早一条，其余删除。"""
+    result = await db.execute(
+        select(Agent)
+        .where(Agent.is_preset == True)
+        .order_by(Agent.name, Agent.created_at.asc(), Agent.id.asc())
+    )
+    agents = result.scalars().all()
+
+    seen: set[str] = set()
+    removed = 0
+    for agent in agents:
+        if agent.name in seen:
+            await db.delete(agent)
+            removed += 1
+        else:
+            seen.add(agent.name)
+
+    if removed:
+        await db.flush()
+        logger.warning("preset_agents_deduped", removed=removed)
 
 
 async def _seed_preset_tools(db: AsyncSession) -> None:
-    """插入预置工具（如已存在则跳过）"""
-    result = await db.execute(
-        select(Tool).where(Tool.is_preset == True).limit(1)
+    """插入预置工具（按 name 幂等，并清理历史重复）。"""
+    await _dedupe_preset_tools(db)
+
+    existing = await db.execute(
+        select(Tool.name).where(Tool.is_preset == True)
     )
-    if result.scalar_one_or_none() is not None:
-        logger.info("preset_tools_already_exist, skip")
-        return
+    existing_names = {row[0] for row in existing.all()}
 
+    created = 0
     for tool_data in PRESET_TOOLS:
-        tool = Tool(
-            user_id=None,  # 预置工具不属于任何用户
-            is_preset=True,
-            **tool_data,
+        if tool_data["name"] in existing_names:
+            continue
+        db.add(
+            Tool(
+                user_id=None,
+                is_preset=True,
+                **tool_data,
+            )
         )
-        db.add(tool)
+        created += 1
 
-    logger.info("preset_tools_created", count=len(PRESET_TOOLS))
+    if created == 0:
+        logger.info("preset_tools_already_exist, skip")
+    else:
+        logger.info("preset_tools_created", count=created)
+
+
+async def _dedupe_preset_tools(db: AsyncSession) -> None:
+    """同名预置工具只保留最早一条，其余删除。"""
+    result = await db.execute(
+        select(Tool)
+        .where(Tool.is_preset == True)
+        .order_by(Tool.name, Tool.created_at.asc(), Tool.id.asc())
+    )
+    tools = result.scalars().all()
+
+    seen: set[str] = set()
+    removed = 0
+    for tool in tools:
+        if tool.name in seen:
+            await db.delete(tool)
+            removed += 1
+        else:
+            seen.add(tool.name)
+
+    if removed:
+        await db.flush()
+        logger.warning("preset_tools_deduped", removed=removed)
 
 
 async def _seed_preset_templates(db: AsyncSession) -> None:
